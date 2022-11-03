@@ -1,0 +1,121 @@
+---
+title: "simulation"
+output: html_document
+date: "2022-11-03"
+---
+
+```{r setup, message=FALSE}
+library(tidyverse)
+
+set.seed(1)
+```
+
+```{r}
+sim_mean_sd = function(n_obs, mu = 2, sigma = 4) {
+  
+  sim_data = tibble(
+    x = rnorm(n_obs, mean = mu, sd = sigma),
+  )
+  
+  sim_data %>% 
+    summarize(
+      mu_hat = mean(x),
+      sigma_hat = sd(x)
+    )
+}
+```
+
+How did we use it before?
+```{r}
+sim_mean_sd(n_obs = 30)
+```
+How can we use it now?
+for loop...
+```{r}
+output = vector ("list", length = 100)
+for (i in 1:100) {  
+  output [[i]]  =sim_mean_sd(n_obs = 30)}
+
+bind_rows(output)
+
+```
+
+list columns instead
+
+```{r}
+sim_results_df = 
+  expand_grid(
+    sample_size = 30,
+    iter = 1:100
+  ) %>% 
+  mutate(
+    estimate_df = map(sample_size, sim_mean_sd)
+  ) %>% 
+  unnest(estimate_df)
+```
+
+```{r}
+sim_results_df %>% 
+  ggplot(aes(x = mu_hat)) + 
+  geom_density()
+```
+input a list with lots of sample sizes 
+```{r}
+sim_results_df = 
+  expand_grid(
+    sample_size = c(30,60,120,240), 
+    iter = 1:1000
+  ) %>% 
+  mutate(
+    estimate_df = map(sample_size, sim_mean_sd)
+  ) %>% 
+  unnest(estimate_df)
+```
+
+```{r}
+sim_results_df %>% 
+  mutate(
+    sample_size = str_c("n = ", sample_size),
+    sample_size = fct_inorder(sample_size)) %>% 
+  ggplot(aes(x = sample_size, y = mu_hat, fill = sample_size)) + 
+  geom_violin()
+```
+```{r}
+sim_results_df %>% 
+  pivot_longer(
+    mu_hat:sigma_hat,
+    names_to = "parameter", 
+    values_to = "estimate") %>% 
+  group_by(parameter, sample_size) %>% 
+  summarize(
+    emp_mean = mean(estimate),
+    emp_var = var(estimate)) %>% 
+  knitr::kable(digits = 3)
+```
+
+see two inputs 
+
+```{r}
+sim_results_df = 
+  expand_grid(
+    sample_size = c(30,60,120,240), 
+    true_sigma = c(6,3),
+    iter = 1:1000
+  ) %>% 
+  mutate(
+    estimate_df = 
+      map2(.x=sample_size, .y=true_sigma, ~sim_mean_sd(n_obs=.x, sigma=.y))
+  ) %>% 
+  unnest(estimate_df)
+```
+
+```{r}
+sim_results_df %>% 
+  mutate(
+    sample_size = str_c("n = ", sample_size),
+    sample_size = fct_inorder(sample_size)) %>% 
+  ggplot(aes(x = sample_size, y = mu_hat, fill = sample_size)) + 
+  geom_violin() +
+  facet_grid(. ~true_sigma)
+```
+
